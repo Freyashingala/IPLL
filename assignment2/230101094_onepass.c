@@ -73,16 +73,18 @@ int program_length = 0;
 char program_name[10];
 
 int get_opcode(char *mnemonic) {
-    for(int i=0;i<29;i++)
+    for(int i=0 ; i<29 ; i++) {
         if(strcmp(OPTAB[i].mnemonic,mnemonic)==0)
             return OPTAB[i].opcode;
+    }
     return -1;
 }
 
 int search_symbol(char *symbol) {
-    for(int i=0;i<symcount;i++)
+    for(int i=0 ; i<symcount ; i++) {
         if(strcmp(SYMTAB[i].name,symbol)==0)
             return i;
+    }
     return -1;
 }
 
@@ -201,9 +203,12 @@ int main() {
             int addr=0;
             int indexed=0;  // whether indexed addressing used(,X)
 
-            if(strcmp(opcode,"RSUB")!=0) {  // RSUB has only 1 word (no operand), so we skip address processing that
-                if(strstr(operand,",X")) {  // if indexed addressing, remove ,X and set indexed to 1
-                    indexed=1;
+            if(strcmp(opcode,"RSUB") != 0) {  // RSUB has only 1 word (no operand), so we skip address processing that
+                char temp_op[20];
+                strcpy(temp_op, operand);
+                if (strlen(temp_op) > 2 && temp_op[strlen(temp_op)-2] == ',') {
+                    temp_op[strlen(temp_op)-2] = '\0';
+                    indexed = 1;
                     operand[strlen(operand)-2]='\0';
                 }
 
@@ -242,10 +247,10 @@ int main() {
         }
 
         else if(strcmp(opcode,"RESW")==0)
-            location_counter+=3*atoi(operand);  // reserve 3 bytes
+            location_counter += 3*atoi(operand);  // reserve 3 bytes
 
         else if(strcmp(opcode,"RESB")==0)
-            location_counter+=atoi(operand);    // reserve 1 byte
+            location_counter += atoi(operand);    // reserve 1 byte
     }
 
     fclose(fin);
@@ -258,7 +263,7 @@ int main() {
     while(i<targetcount) {
         int record_start = target[i].loc;
         int length = 0;
-        char record[60]=""; // maximum 30 bytes so 60 hex chars
+        char record[60] = ""; // maximum 30 bytes so 60 hex chars
         int j=i;
         int last_loc = target[i].loc;   // helps in detecting memory gaps
 
@@ -270,7 +275,7 @@ int main() {
             if(j>i && current_loc != last_loc)  // if crossed the given memory
                 break;
 
-            if(length + bytes > 30) // if more than 30 bytes
+            if(length+bytes > 30) // if more than 30 bytes
                 break;
 
             strcat(record,target[j].obj);
@@ -279,11 +284,11 @@ int main() {
             j++;
         }
 
-        fprintf(fout,"T%06X%02X%s\n",record_start,length,record);
+        fprintf(fout, "T%06X%02X%s\n", record_start, length, record);
         i=j;
     }
 
-    fprintf(fout,"E%06X\n",execution_addr);
+    fprintf(fout, "E%06X\n", execution_addr);
     fclose(fout);
 
     printf("Output written to output_onepass.txt\n");
