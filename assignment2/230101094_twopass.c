@@ -47,8 +47,8 @@ struct symbol {
     int addr;
 } SYMTAB[100];
 
-int no_of_sym = 0;  // number of symbols
-int PROG_LEN;   // program length for header record of pass 2
+int symcount = 0;  // number of symbols
+int program_length;   // program length for header record of pass 2
 int start_addr;    // start address
 
 // getting value of opcode from OPTAB
@@ -61,20 +61,20 @@ char* get_opcode(char *mnemonic) {
 
 // add symbol to SYMTAB
 void insert_symbol(char *label, int addr) {
-    for(int i=0; i < no_of_sym; i++) {
+    for(int i=0; i < symcount; i++) {
         if(strcmp(SYMTAB[i].name, label) == 0) {
             printf("Error: Duplicate symbol %s\n", label);
             return;
         }
     }
-    strcpy(SYMTAB[no_of_sym].name, label);
-    SYMTAB[no_of_sym].addr = addr;
-    no_of_sym++;
+    strcpy(SYMTAB[symcount].name, label);
+    SYMTAB[symcount].addr = addr;
+    symcount++;
 }
 
 // search symbol address from SYMTAB
 int search_symbol(char *label) {
-    for(int i=0 ; i < no_of_sym ; i++) {
+    for(int i=0 ; i < symcount ; i++) {
         if(strcmp(SYMTAB[i].name, label) == 0) {
             return SYMTAB[i].addr;
         }
@@ -107,22 +107,28 @@ void pass1() {
     }
 
     while (fgets(line, 100, input)) {
-        strcpy(label, ""); strcpy(mnemonic, ""); strcpy(operand, "");
+        strcpy(label, ""); 
+        strcpy(mnemonic, ""); 
+        strcpy(operand, "");
+
         char w1[20], w2[20], w3[20];
         int count = sscanf(line, "%s %s %s", w1, w2, w3);
 
         if (count == 3) {
-            strcpy(label, w1); strcpy(mnemonic, w2); strcpy(operand, w3);
+            strcpy(label, w1); 
+            strcpy(mnemonic, w2); 
+            strcpy(operand, w3);
         }
         else if (count == 2) { 
             if (get_opcode(w1) != NULL || strcmp(w1, "END") == 0) {
-               strcpy(mnemonic, w1); strcpy(operand, w2);
+               strcpy(mnemonic, w1); 
+               strcpy(operand, w2);
             } else {
-               strcpy(label, w1); strcpy(mnemonic, w2);
+               strcpy(label, w1); 
+               strcpy(mnemonic, w2);
             }
-        } else if (count == 1) { 
+        } else if (count == 1)
             strcpy(mnemonic, w1);
-        }
         
         if (strcmp(mnemonic, "END") == 0) break;
         if (line[0] == '.') continue; 
@@ -136,13 +142,14 @@ void pass1() {
         else if (strcmp(mnemonic, "RESW") == 0) location_counter += 3 * atoi(operand);  // residual word is 3 bytes each
         else if (strcmp(mnemonic, "RESB") == 0) location_counter += atoi(operand);  // residual byte is 1 byte each
         else if (strcmp(mnemonic, "BYTE") == 0) {
-            if (operand[0] == 'C') location_counter += strlen(operand) - 3; // character string
-            if (operand[0] == 'X') location_counter += (strlen(operand) - 3) / 2;   // hex string (/2 as 2 hex digits is 1 byte)
+            int len = strlen(operand) - 3;
+            if (operand[0] == 'C') location_counter += len; // character string
+            if (operand[0] == 'X') location_counter += len/2;   // hex string (/2 as 2 hex digits is 1 byte)
         }
     }
 
     fprintf(intermediate, "%X - %s %s\n", location_counter, mnemonic, operand);
-    PROG_LEN = location_counter - start_addr;
+    program_length = location_counter - start_addr;
     
     fclose(input);
     fclose(intermediate);
@@ -166,7 +173,7 @@ void pass2() {
     fscanf(intermediate, "%s %s %s %s", addr_str, label, mnemonic, operand);
 
     if (strcmp(mnemonic, "START") == 0) {   // if mnemonic is start
-        fprintf(fp_obj, "H%-6s%06X%06X\n", label, start_addr, PROG_LEN);    // first line should be header
+        fprintf(fp_obj, "H%-6s%06X%06X\n", label, start_addr, program_length);    // first line should be header
         fscanf(intermediate, "%s %s %s %s", addr_str, label, mnemonic, operand);
     }
     
@@ -174,7 +181,7 @@ void pass2() {
 
     while (strcmp(mnemonic, "END") != 0 && !feof(intermediate)) {
         int current_loc = (int)strtol(addr_str, NULL, 16);
-        char object_code[20] = "";
+        char object_code[MAX_OBJ_CODE] = "";
         char *op_value = get_opcode(mnemonic);
 
         if (op_value != NULL) {
@@ -194,45 +201,53 @@ void pass2() {
                 target_addr = search_symbol(temp_op);   // finding address of label in SYMTAB
             }
             
-            if (is_indexed) target_addr += 0x8000;  // apitplying the indexing bit
+            if (is_indexed) target_addr += 0x8000;  // setting index bit to 1
 
             sprintf(object_code, "%s%04X", op_value, target_addr);
         }
         else if (strcmp(mnemonic, "BYTE") == 0) {
-            if (operand[0] == 'C') {
-                for (int i = 2; i < strlen(operand)-1; i++) 
-                    sprintf(object_code+strlen(object_code), "%02X", operand[i]);
-            } else if (operand[0] == 'X') {
+            if (operand[0] == 'C') {    // converts characters into their hex values (c to detect whether characters)
+                int k = 0;
+                for (int i = 2; i < strlen(operand) - 1; i++) {
+                    sprintf(&object_code[k], "%02X", (unsigned char)operand[i]);
+                    k += 2;
+                }
+                object_code[k] = '\0';
+            } else if (operand[0] == 'X') { // if hex, excreact hex digits
                 strncat(object_code, operand+2, strlen(operand)-3);
             }
         }
-        else if (strcmp(mnemonic, "WORD") == 0) {
+        else if (strcmp(mnemonic, "WORD") == 0) {   // convert decimal to hex(6 digit)
             sprintf(object_code, "%06X", atoi(operand));
         }
 
         if (strlen(object_code) > 0) {
             int len_bytes = strlen(object_code) / 2;
-            int is_continuous = (buffer_length == 0) || (buffer_start_addr + buffer_length == current_loc);
-            
-            if (buffer_length + len_bytes > 30 || !is_continuous) {
-                // CHANGED: Removed '^' separators
-                fprintf(fp_obj, "T%06X%02X%s\n", buffer_start_addr, buffer_length, buffer);
+
+            // check if the record is getting longer than 30 bytes or if we encurred a gap (RESW)
+            int expected = buffer_start_addr + buffer_length;
+            if (buffer_length > 0 && (buffer_length + len_bytes > 30 || current_loc != expected)) {
+                if (buffer_length > 0) {
+                    fprintf(fp_obj, "T%06X%02X%s\n", buffer_start_addr, buffer_length, buffer);
+                }
+                
+                // reset
                 strcpy(buffer, "");
                 buffer_length = 0;
                 buffer_start_addr = current_loc;
             }
-            
-            if (buffer_length == 0) buffer_start_addr = current_loc;
+
+            // add code to the buffer
             strcat(buffer, object_code);
             buffer_length += len_bytes;
         }
 
-        fscanf(intermediate, "%s %s %s %s", addr_str, label, mnemonic, operand);
+        fscanf(intermediate, "%s %s %s %s", addr_str, label, mnemonic, operand);    // continue the loop
     }
 
-    if (buffer_length > 0) fprintf(fp_obj, "T%06X%02X%s\n", buffer_start_addr, buffer_length, buffer);
+    if (buffer_length > 0) fprintf(fp_obj, "T%06X%02X%s\n", buffer_start_addr, buffer_length, buffer);  // write the part which is still in the buffer
 
-    fprintf(fp_obj, "E%06X\n", start_addr);
+    fprintf(fp_obj, "E%06X\n", start_addr); // write end record
 
     fclose(intermediate);
     fclose(fp_obj);
