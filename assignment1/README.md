@@ -15,7 +15,7 @@ Set a: Question 10
 Set b, part 1: Question 9
     Commands:
         nasm -f elf32 230101094_setb_part1.asm -o 230101094_setb_part1.o
-        ld -m elf_i386 230101094_setb_part1.o -o 230101094_setb-part1
+        ld -m elf_i386 230101094_setb_part1.o -o 230101094_setb_part1
         ./230101094_setb_part1
         input:  Enter the filename: test.txt
         output: Words: 2
