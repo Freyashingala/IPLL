@@ -1,16 +1,9 @@
-CC = gcc
-LEX = flex
-TARGET = lexer
-LEX_FILE = a3_roll.l
-C_FILE = lex.yy.c
+NAME = a3_230101094
 
-all: $(TARGET)
-
-$(TARGET): $(C_FILE)
-	$(CC) $(C_FILE) -o $(TARGET)
-
-$(C_FILE): $(LEX_FILE)
-	$(LEX) $(LEX_FILE)
+all:
+	flex $(NAME).l
+	gcc lex.yy.c -lfl
+	./a.out $(NAME)_test.nc
 
 clean:
-	rm -f $(TARGET) $(C_FILE) a3_roll_token.txt a3_roll_st.txt
+	rm -f a.out lex.yy.c $(NAME)_token.txt $(NAME)_st.txt
