@@ -7,27 +7,27 @@ int line_no = 1;
 FILE *token_file;
 FILE *st_file;
 
-// linked list for the SymTab
+// Basic linked list for the Symbol Table
 struct STNode {
     char *name;
     struct STNode *next;
 };
 struct STNode *st_head = NULL;
 
-// insert identifiers into the symbol table
+// Function to insert identifiers into the symbol table
 void insert_st(char *name) {
     struct STNode *curr = st_head;
     while (curr != NULL) {
-        if (strcmp(curr->name, name) == 0) return; // ignore if already present in the table
+        if (strcmp(curr->name, name) == 0) return; // Ignore if already exists
         curr = curr->next;
     }
-    struct STNode *new_node = (struct STNode *)malloc(sizeof(struct STNode));   // assigning space for the new node
+    struct STNode *new_node = (struct STNode *)malloc(sizeof(struct STNode));
     new_node->name = strdup(name);
     new_node->next = st_head;
-    st_head = new_node; // setting new node as the head
+    st_head = new_node;
 }
 
-// print the symbol table to file
+// Function to print the symbol table to the file
 void print_st() {
     struct STNode *curr = st_head;
     while (curr != NULL) {
@@ -37,73 +37,61 @@ void print_st() {
 }
 %}
 
-/* lexical grammar */
-/* 3. Identifiers */
-DIGIT               [0-9]
-NONDIGIT            [_a-zA-Z]
-IDENTIFIER          {NONDIGIT}({NONDIGIT}|{DIGIT})*
+/* Regular Expression Definitions */
+DIGIT           [0-9]
+NONZERO_DIGIT   [1-9]
+NONDIGIT        [a-zA-Z_]
+ID              {NONDIGIT}({NONDIGIT}|{DIGIT})*
 
-/* 4. Constants */
-NONZERO-DIGIT       [1-9]
-INTEGER-CONSTANT    {NONZERO-DIGIT}{DIGIT}*|0
+INTEGER         {NONZERO_DIGIT}{DIGIT}*|0
+FRACTIONAL      ({DIGIT}*\.{DIGIT}+|{DIGIT}+\.)
+FLOAT           {FRACTIONAL}
 
-DIGIT-SEQUENCE      {DIGIT}+
-SIGN                [+-]
-FRACTIONAL-CONSTANT ({DIGIT-SEQUENCE}?\.{DIGIT-SEQUENCE}|{DIGIT-SEQUENCE}\.)
-FLOATING-CONSTANT   {FRACTIONAL-CONSTANT}
+ESCAPE          \\[\'\"\?\\abfnrtv]
+CCHAR           ([^'\\\n]|{ESCAPE})
+CHAR_CONST      \'{CCHAR}+\'
 
-C-CHAR              ([^'\\\n]|{ESCAPE-SEQUENCE})
-C-CHAR-SEQUENCE     {C-CHAR}+
-CHARACTER-CONSTANT  \'{C-CHAR-SEQUENCE}\'
-ESCAPE-SEQUENCE     \\[\'\"\?\\abfnrtv]
-
-/* 5. String Literals */
-S-CHAR              ([^\"\\\n]|{ESCAPE-SEQUENCE})
-S-CHAR-SEQUENCE     {S-CHAR}*
-STRING-LITERAL      \"{S-CHAR-SEQUENCE}\"
+SCHAR           ([^\"\\\n]|{ESCAPE})
+STRING_LITERAL  \"{SCHAR}*\"
 
 %%
- /* Rules */
- /* 2. Keywords */
+
+"/*"([^*]|\*+[^*/])*\*+"/" { 
+    // Match multi-line comments and count newlines to maintain accurate line numbers
+    for(int i = 0; yytext[i] != '\0'; i++) {
+        if(yytext[i] == '\n') line_no++;
+    }
+}
+"//".* { /* Ignore single-line comments */ }
+
+\n              { line_no++; }
+[ \t\r]+        { /* Ignore whitespace */ }
+
 "break"|"default"|"return"|"void"|"case"|"float"|"short"|"double"|"char"|"for"|"signed"|"while"|"else"|"unsigned"|"long"|"_Bool"|"continue"|"if"|"static"|"do"|"int" { 
     fprintf(token_file, "<KEYWORD, %s>\n", yytext); 
 }
 
- /* 3, 4, 5. Identifiers, Constants, and Strings */
-{IDENTIFIER}          { insert_st(yytext); fprintf(token_file, "<IDENTIFIER, %s>\n", yytext); }
-{INTEGER-CONSTANT}    { fprintf(token_file, "<INTEGER-CONST, %s>\n", yytext); }
-{FLOATING-CONSTANT}   { fprintf(token_file, "<FLOAT-CONST, %s>\n", yytext); }
-{CHARACTER-CONSTANT}  { fprintf(token_file, "<CHAR-CONST, %s>\n", yytext); }
-{STRING-LITERAL}      { fprintf(token_file, "<STRING-LITERAL, %s>\n", yytext); }
-
- /* 6. Punctuators */
-"["|"]"|"("|")"|"{"|"}"|"."|"->"|"++"|"--"|"&"|"*"|"+"|"-"|"~"|"!"|"/"|"%"|"<<"|">>"|"<"|">"|"<="|">="|"=="|"!="|"^"|"|"|"&&"|"||"|"?"|":"|";"|"..."|"="|"*="|"/="|"%="|"+="|"-="|"<<="|">>="|"&="|"^="|"|="|","|"#" { 
+"["|"]"|"("|")"|"{"|"}"|"->"|"++"|"--"|"&"|"*"|"+"|"-"|"~"|"!"|"/"|"%"|"<<"|">>"|"<"|">"|"<="|">="|"=="|"!="|"^"|"|"|"&&"|"||"|"?"|":"|";"|"..."|"="|"*="|"/="|"%="|"+="|"-="|"<<="|">>="|"&="|"^="|"|="|","|"#" { 
     fprintf(token_file, "<PUNCTUATOR, %s>\n", yytext); 
 }
 
- /* 7. Comments */
-"/*"([^*]|\*+[^*/])*\*+"/" { 
-    for(int i = 0; yytext[i] != '\0'; i++) {
-        if(yytext[i] == '\n') line_no++;    // counting newlines in multi-line comments to maintain correct line number
-    }
-}
+{ID}            { insert_st(yytext); fprintf(token_file, "<IDENTIFIER, %s>\n", yytext); }
+{INTEGER}       { fprintf(token_file, "<INTEGER_CONST, %s>\n", yytext); }
+{FLOAT}         { fprintf(token_file, "<FLOAT_CONST, %s>\n", yytext); }
+{CHAR_CONST}    { fprintf(token_file, "<CHAR_CONST, %s>\n", yytext); }
+{STRING_LITERAL} { fprintf(token_file, "<STRING_LITERAL, %s>\n", yytext); }
 
- /* Ignore single-line comment */ 
-"//".*   {}
-
-\n       { line_no++; }
-
- /* Ignore whitespace */ 
-[ \t\r]+ {}
-
- /* Catch-all for unrecognized tokens */
-.        { printf("Error: Unrecognized token '%s' at line %d\n", yytext, line_no); }
+.               { printf("Error: Unrecognized token '%s' at line %d\n", yytext, line_no); }
 
 %%
 
+int yywrap() {
+    return 1;
+}
+
 int main(int argc, char **argv) {
     if (argc < 2) {
-        printf("Usage: ./a.out <input_file>\n");
+        printf("Usage: ./lexer <input_file>\n");
         return 1;
     }
     
@@ -113,8 +101,9 @@ int main(int argc, char **argv) {
         return 1;
     }
     
-    token_file = fopen("a3_230101094_token.txt", "w");
-    st_file = fopen("a3_230101094_st.txt", "w");
+    // Remember to rename these files to include your actual roll number!
+    token_file = fopen("a3_roll_token.txt", "w");
+    st_file = fopen("a3_roll_st.txt", "w");
     
     yyin = input;
     yylex();
