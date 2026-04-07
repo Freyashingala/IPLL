@@ -7,4 +7,4 @@ all:
 	./a.out < $(NAME)_test.nc
 
 clean:
-	rm -f a.out lex.yy.c y.tab.h $(NAME)_token.txt $(NAME)_st.txt
+	rm -f a.out lex.yy.c y.tab.c y.tab.h $(NAME)_token.txt $(NAME)_st.txt
